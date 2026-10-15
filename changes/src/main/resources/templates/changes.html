@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div th:replace="~{layout :: body(~{::main})}">
+    <main>
+        <div class="page-hd">
+            <div>
+                <h1 class="page-title">Changes</h1>
+                <p class="page-sub">Track what's in WireMock memory and what's already on disk</p>
+            </div>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-ghost btn-sm" id="saveAllBtn"
+                        th:if="${sourceType == 'API'}"
+                        onclick="saveAll()">💾 Save all to disk
+                </button>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" id="tabPendingBtn" onclick="switchTab('pending')">
+                Pending
+                <span th:if="${#lists.size(pending) > 0}"
+                      style="background:var(--c-put);color:#fff;font-size:10px;padding:1px 6px;
+                             border-radius:10px;margin-left:5px;font-weight:600"
+                      th:text="${#lists.size(pending)}"></span>
+            </button>
+            <button class="tab" id="tabLogBtn" onclick="switchTab('log')">
+                Saved to disk
+                <span th:if="${#lists.size(changelog) > 0}"
+                      style="background:var(--c-surface-2);color:var(--c-text-3);font-size:10px;
+                             padding:1px 6px;border-radius:10px;margin-left:5px"
+                      th:text="${#lists.size(changelog)}"></span>
+            </button>
+        </div>
+
+        <div id="tabPending">
+            <div th:if="${#lists.isEmpty(pending)}" class="empty" style="padding:40px 0">
+                <div class="empty-ico">✅</div>
+                <div class="empty-title">Everything is saved</div>
+                <div class="empty-desc">No in-memory changes waiting to be written to disk</div>
+            </div>
+
+            <div th:if="${!#lists.isEmpty(pending)}">
+                <div class="notice n-info" style="margin-bottom:16px">
+                    <span class="notice-ico">ℹ</span>
+                    <span th:if="${sourceType == 'API'}">
+                        These changes are in WireMock memory but not yet on disk.
+                        <strong>Discard</strong> reverts the stub in WireMock.
+                        <strong>Save all to disk</strong> persists everything at once via WireMock Admin API.
+                    </span>
+                    <span th:if="${sourceType != 'API'}">
+                        These changes have been applied. <strong>Discard</strong> reverts the file on disk.
+                    </span>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)">
+                        Select all
+                    </label>
+                    <div style="flex:1"></div>
+                    <button class="btn btn-ghost btn-sm" style="color:var(--c-delete)"
+                            onclick="discardSelected()">↩ Discard selected
+                    </button>
+                </div>
+
+                <div class="tbl-wrap">
+                    <table class="tbl" id="pendingTable">
+                        <thead>
+                        <tr>
+                            <th style="width:36px"></th>
+                            <th style="width:80px">Action</th>
+                            <th style="width:80px">Method</th>
+                            <th>URL / Name</th>
+                            <th style="width:160px">By</th>
+                            <th style="width:160px">When</th>
+                            <th style="width:60px" class="center"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="c : ${pending}"
+                            th:data-id="${c.id}"
+                            th:data-mine="${currentUser != null and c.changedBy == currentUser.username}">
+                            <td class="center">
+                                <input type="checkbox" class="pending-cb"
+                                       th:value="${c.id}"
+                                       th:disabled="${currentUser == null or c.changedBy != currentUser.username}">
+                            </td>
+                            <td>
+                                <span th:switch="${c.action.name()}">
+                                    <span th:case="'CREATE'" style="font-size:11px;font-weight:600;
+                                          color:var(--c-get);background:var(--c-get-bg);border:1px solid var(--c-get-bd);
+                                          padding:2px 8px;border-radius:10px">CREATE</span>
+                                    <span th:case="'UPDATE'" style="font-size:11px;font-weight:600;
+                                          color:var(--c-accent);background:var(--c-accent-dim);border:1px solid var(--c-post-bd);
+                                          padding:2px 8px;border-radius:10px">UPDATE</span>
+                                    <span th:case="'DELETE'" style="font-size:11px;font-weight:600;
+                                          color:var(--c-delete);background:var(--c-delete-bg);border:1px solid var(--c-delete-bd);
+                                          padding:2px 8px;border-radius:10px">DELETE</span>
+                                </span>
+                            </td>
+                            <td>
+                                <span class="method"
+                                      th:if="${c.method != null}"
+                                      th:classappend="'m-' + ${c.method}"
+                                      th:text="${c.method}"></span>
+                            </td>
+                            <td>
+                                <div class="mono fw5" style="font-size:12.5px" th:text="${c.url} ?: '-'"></div>
+                                <div th:if="${c.name != null and c.name != c.url}"
+                                     class="t3" style="font-size:11px" th:text="${c.name}"></div>
+                            </td>
+                            <td>
+                                <div style="font-size:12.5px;font-weight:500" th:text="${c.changedByDisplay}"></div>
+                                <div class="t3 mono" style="font-size:11px" th:text="${c.changedBy}"></div>
+                            </td>
+                            <td class="t3 mono" style="font-size:11px"
+                                th:text="${#strings.substring(c.changedAt, 0, 19)}"></td>
+                            <td class="center">
+                                <button th:if="${currentUser != null and c.changedBy == currentUser.username}"
+                                        class="btn btn-ico" title="Revert in WireMock"
+                                        style="font-size:12px;color:var(--c-delete)"
+                                        th:data-id="${c.id}"
+                                        onclick="discardOne(this.getAttribute('data-id'))">↩
+                                </button>
+
+                                <span th:if="${currentUser == null or c.changedBy != currentUser.username}"
+                                      th:title="'Only ' + ${c.changedByDisplay} + ' can revert this change'"
+                                      style="display:inline-flex;align-items:center;justify-content:center;
+                                             width:28px;height:28px;font-size:12px;color:var(--c-text-3)">🔒</span>
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="tabLog" style="display:none">
+            <div th:if="${#lists.isEmpty(changelog)}" class="empty" style="padding:40px 0">
+                <div class="empty-ico">📋</div>
+                <div class="empty-title">No changelog yet</div>
+                <div class="empty-desc"
+                     th:text="'Log file: ' + ${@environment.getProperty('wiremock.changelog.path','./changelog.log')}"></div>
+            </div>
+
+            <div th:if="${!#lists.isEmpty(changelog)}" class="tbl-wrap">
+                <table class="tbl">
+                    <thead>
+                    <tr>
+                        <th style="width:160px">Timestamp</th>
+                        <th style="width:80px">Action</th>
+                        <th>Stub</th>
+                        <th style="width:160px">User</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr th:each="entry : ${changelog}">
+                        <td class="mono t3" style="font-size:11px;white-space:nowrap"
+                            th:text="${entry.timestamp()}"></td>
+                        <td>
+                            <span th:switch="${entry.action()}">
+                                <span th:case="'CREATE'" style="font-size:11px;font-weight:600;
+                                      color:var(--c-get);background:var(--c-get-bg);border:1px solid var(--c-get-bd);
+                                      padding:2px 8px;border-radius:10px">CREATE</span>
+                                <span th:case="'UPDATE'" style="font-size:11px;font-weight:600;
+                                      color:var(--c-accent);background:var(--c-accent-dim);border:1px solid var(--c-post-bd);
+                                      padding:2px 8px;border-radius:10px">UPDATE</span>
+                                <span th:case="'DELETE'" style="font-size:11px;font-weight:600;
+                                      color:var(--c-delete);background:var(--c-delete-bg);border:1px solid var(--c-delete-bd);
+                                      padding:2px 8px;border-radius:10px">DELETE</span>
+                                <span th:case="*" style="font-size:11px;color:var(--c-text-3)"
+                                      th:text="${entry.action()}"></span>
+                            </span>
+                        </td>
+                        <td>
+                            <div class="mono fw5" style="font-size:12.5px" th:text="${entry.endpoint()}"></div>
+                            <div class="t3 mono" style="font-size:11px" th:text="${entry.id()}"></div>
+                        </td>
+                        <td class="t2" style="font-size:12.5px" th:text="${entry.username()}"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+</div>
+<script th:src="@{/webjars/bootstrap/5.3.2/js/bootstrap.bundle.min.js}"></script>
+<script>
+    function switchTab(tab) {
+        document.getElementById('tabPending').style.display = tab === 'pending' ? '' : 'none';
+        document.getElementById('tabLog').style.display     = tab === 'log'     ? '' : 'none';
+        document.getElementById('tabPendingBtn').className  = 'tab' + (tab === 'pending' ? ' active' : '');
+        document.getElementById('tabLogBtn').className      = 'tab' + (tab === 'log'     ? ' active' : '');
+    }
+
+    function toggleSelectAll(cb) {
+        document.querySelectorAll('.pending-cb').forEach(c => c.checked = cb.checked);
+    }
+
+    function selectedIds() {
+        return [...document.querySelectorAll('.pending-cb:checked:not(:disabled)')].map(c => c.value);
+    }
+
+    function saveAll() {
+        if (!confirm('Persist all pending changes to WireMock disk?')) return;
+        setLoading(true);
+        fetch('/api/changes/save-all', { method: 'POST' })
+            .then(r => { if (r.ok) location.reload(); else alert('Save failed'); })
+            .finally(() => setLoading(false));
+    }
+
+    function discardSelected() {
+        const ids = selectedIds();
+        if (!ids.length) { alert('Select at least one change'); return; }
+        if (!confirm('Revert ' + ids.length + ' change(s) in WireMock? The stubs will be restored to their previous state.')) return;
+        fetch('/api/changes/discard-selected', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(ids)
+        }).then(r => { if (r.ok) location.reload(); else alert('Discard failed'); });
+    }
+
+    function discardOne(id) {
+        if (!confirm('Revert this change in WireMock? The stub will be restored to its previous state.')) return;
+        fetch('/api/changes/discard-selected', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify([id])
+        }).then(r => { if (r.ok) location.reload(); else alert('Discard failed'); });
+    }
+
+    function setLoading(on) {
+        const btn = document.getElementById('saveAllBtn');
+        if (btn) btn.disabled = on;
+    }
+</script>
+</body>
+</html>

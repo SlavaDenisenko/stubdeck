@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div th:fragment="mappingBlock">
+    <div th:if="${page.totalElements == 0}" class="tbl-wrap empty">
+        <div class="empty-ico">📭</div>
+        <div class="empty-title">No mappings found</div>
+        <div class="empty-desc">Check your mappings directory or create the first stub</div>
+        <a th:if="${accessGuard.canEdit()}" th:href="@{/mappings/new}" class="btn btn-primary">+ Create mapping</a>
+    </div>
+
+    <div class="tbl-wrap" th:if="${page.totalElements > 0}">
+        <table class="tbl" id="mappingsTable">
+            <colgroup>
+                <col class="col-method"/>
+                <col class="col-url"/>
+                <col class="col-name"/>
+                <col class="col-prio"/>
+                <col class="col-status"/>
+                <col class="col-actions"/>
+            </colgroup>
+            <thead>
+            <tr>
+                <th>Method</th>
+                <th>URL</th>
+                <th>Name</th>
+                <th class="center">Priority</th>
+                <th class="center">Status</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody th:with="canEdit=${accessGuard.canEdit()},canDelete=${accessGuard.canDelete()}">
+            <th:block th:each="mapping : ${mappings}">
+                <tr th:data-method="${mapping.request?.method}"
+                    th:data-url="${mapping.request?.effectiveUrl}"
+                    th:data-id="${mapping.id}"
+                    th:data-name="${mapping.name} ?: ${mapping.request?.effectiveUrl}"
+                    th:onclick="|rowClick(event,this.getAttribute('data-id'))|">
+                    <td>
+                            <span class="method"
+                                  th:classappend="'m-' + (${mapping.request?.method} ?: 'ANY')"
+                                  th:text="${mapping.request?.method} ?: 'ANY'"></span>
+                    </td>
+                    <td class="mono fw5" th:text="${mapping.request?.effectiveUrl}"></td>
+                    <td class="t2 trunc">
+                        <span th:text="${mapping.name} ?: '—'"></span>
+                        <th:block th:if="${locks[mapping.id] != null}">
+                            <span style="font-size:10px;color:var(--c-put);margin-left:6px">🔒</span>
+                            <span style="font-size:11px;color:var(--c-put);font-weight:500"
+                                  th:text="${locks[mapping.id].changedByDisplay} ?: ${locks[mapping.id].changedBy}"></span>
+                        </th:block>
+                    </td>
+                    <td class="center mono t3" style="white-space:nowrap" th:text="${mapping.priority} ?: '—'"></td>
+                    <td class="center">
+                            <span class="status"
+                                  th:with="s=${mapping.response?.status}"
+                                  th:classappend="${s == null} ? 's-nil' :
+                                                  (${s >= 200 and s < 300} ? 's-2xx' :
+                                                  (${s >= 300 and s < 400} ? 's-3xx' :
+                                                  (${s >= 400 and s < 500} ? 's-4xx' : 's-5xx')))"
+                                  th:text="${s} ?: '-'"></span>
+                    </td>
+                    <td class="actions" onclick="event.stopPropagation()">
+                        <div style="display:flex;gap:5px;justify-content:flex-end">
+                            <a class="btn btn-ico"
+                               th:if="${canEdit and !lockedByOther.contains(mapping.id)}"
+                               title="Edit"
+                               th:href="@{/mappings/{id}/edit(id=${mapping.id})}">✏️
+                            </a>
+                            <button class="btn btn-ico"
+                                    th:if="${canEdit and lockedByOther.contains(mapping.id)}"
+                                    title="Locked - click for details"
+                                    style="color:var(--c-put);border-color:var(--c-put-bd)"
+                                    th:data-user="${locks[mapping.id]?.changedByDisplay} ?: ${locks[mapping.id]?.changedBy}"
+                                    th:data-email="${locks[mapping.id]?.changedByEmail}"
+                                    onclick="openLockModal(this.dataset.user, this.dataset.email)">🔒
+                            </button>
+                            <button class="btn btn-ico btn-ico-del"
+                                    th:if="${canDelete and !lockedByOther.contains(mapping.id)}"
+                                    title="Delete"
+                                    th:data-id="${mapping.id}"
+                                    th:data-name="${mapping.name} ?: ${mapping.request?.effectiveUrl}"
+                                    onclick="handleDelete(this)">🗑️
+                            </button>
+                            <button class="btn btn-ico"
+                                    th:if="${canDelete and lockedByOther.contains(mapping.id)}"
+                                    title="Cannot delete - locked"
+                                    style="color:var(--c-put);border-color:var(--c-put-bd)"
+                                    th:data-user="${locks[mapping.id]?.changedByDisplay} ?: ${locks[mapping.id]?.changedBy}"
+                                    th:data-email="${locks[mapping.id]?.changedByEmail}"
+                                    onclick="openLockModal(this.dataset.user, this.dataset.email)">🔒
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            </th:block>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="pagination-summary" th:if="${page.totalElements > 0}">
+        Showing
+        <span th:text="${page.fromElement}"></span>
+        -
+        <span th:text="${page.toElement}"></span>
+        of
+        <span th:text="${page.totalElements}"></span>
+        mappings
+
+    </div>
+
+    <nav class="pagination" th:if="${page.totalPages > 1}">
+        <button th:if="${!page.first}"
+                type="button"
+                class="page-button"
+                th:data-page="${page.page - 1}">
+            Previous
+        </button>
+
+        <th:block th:each="item : ${pageNumbers}">
+            <span th:if="${item.ellipsis}" class="pagination-ellipsis">...</span>
+
+            <button th:unless="${item.ellipsis}"
+                    type="button"
+                    class="page-button"
+                    th:data-page="${item.page}"
+                    th:classappend="${item.page == page.page} ? 'active' : ''"
+                    th:text="${item.page + 1}"
+                    th:disabled="${item.page == page.page}">
+            </button>
+        </th:block>
+
+        <button th:if="${!page.last}"
+                type="button"
+                class="page-button"
+                th:data-page="${page.page + 1}">
+            Next
+        </button>
+    </nav>
+</div>
+</body>
+</html>

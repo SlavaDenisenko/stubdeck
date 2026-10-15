@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: stubdeck
+  thymeleaf:
+    cache: false
+
+server:
+  port: 8090
+
+wiremock:
+  source:
+    type: API
+  mappings:
+    path: ./mappings
+  conflict:
+    strategy: WARN # BLOCK | WARN | ALLOW
+  changelog:
+    path: ./changelog.log
+  admin:
+    scheme: http
+    host: localhost
+    port: 8091
+  auth:
+    enabled: true
+    provider-type: LDAP
+    ldap:
+      url: ldap://localhost:3389
+      bind-dn: cn=admin,dc=company,dc=local
+      password: admin
+      base-dn: dc=company,dc=local
+      user-search-base: ou=Users
+      user-search-filter: (cn={0})
+      group-search-base: ou=Groups
+      group-search-filter: (member={0})
+      role-mappings:
+        ROLE_ADMIN: cn=wiremock-admins,ou=Groups,dc=company,dc=local
+        ROLE_DEVELOPER: cn=wiremock-developers,ou=Groups,dc=company,dc=local
+        ROLE_QA: cn=wiremock-qa,ou=Groups,dc=company,dc=local
+      department-attribute: departmentNumber
+    memory:
+      users:
+        - username: admin
+          password: admin
+          roles: [ ADMIN ]
+        - username: dev
+          password: dev
+          roles: [ DEVELOPER ]
+        - username: qa
+          password: qa
+          roles: [ QA ]
+
+logging:
+  level:
+    org.springframework.security: DEBUG
+    org.springframework.ldap: DEBUG
+    com.sun.jndi.ldap: DEBUG

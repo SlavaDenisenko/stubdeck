@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div th:replace="~{layout :: body(~{::main})}">
+    <main>
+        <div class="page-hd">
+            <div>
+                <h1 class="page-title"
+                    th:text="${mapping.id != null} ? 'Edit mapping' : 'New mapping'"></h1>
+                <p class="page-sub mono t3"
+                   th:text="${mapping.id != null} ? ${mapping.id} : 'Configure request matcher and response stub'"></p>
+            </div>
+            <div style="display:flex;gap:8px">
+                <button class="btn btn-ghost" onclick="toggleTemplates()">⊟ Templates</button>
+                <a th:href="${mapping.id != null} ? @{/mappings/{id}(id=${mapping.id})} : @{/}" class="btn btn-ghost">←
+                    Back</a>
+            </div>
+        </div>
+
+        <div style="margin-bottom:16px"></div>
+
+        <div class="notice n-info">
+            <span class="notice-ico">ℹ</span>
+            <span>Conflict strategy: <strong th:text="${conflictStrategy}"></strong> -
+        change via <code>wiremock.conflict.strategy</code> in
+        <code>application.yaml</code> (BLOCK / WARN / ALLOW)</span>
+        </div>
+
+        <div id="conflictAlert" class="notice n-warn" style="display:none">
+            <span class="notice-ico">⚠</span>
+            <div>
+                <strong>Conflict detected</strong> - a mapping for
+                <code id="conflictKey"></code> already exists.
+                <span id="warnActions" style="display:none">
+                &nbsp;
+                <button class="btn btn-sm btn-danger" onclick="saveForce()">Save anyway</button>
+            </span>
+            </div>
+        </div>
+
+        <div id="templatesPanel" style="display:none; margin-bottom:20px">
+            <div class="card">
+                <div class="card-hd">
+                    <span style="font-size:13px;font-weight:600">Quick start templates</span>
+                    <button class="btn btn-ghost btn-sm" onclick="toggleTemplates()">✕ Close</button>
+                </div>
+                <div id="templateGrid"
+                     style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:16px">
+                </div>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" id="tabFormBtn" onclick="switchTab('form')">Form</button>
+            <button class="tab" id="tabJsonBtn" onclick="switchTab('json')">Raw JSON</button>
+        </div>
+
+        <div id="formTab">
+            <div class="card card-bd">
+
+                <div style="display:grid;grid-template-columns:160px 1fr;gap:14px;margin-bottom:14px">
+                    <div class="field" style="margin-bottom:0">
+                        <label class="f-label">URL match type</label>
+                        <select id="urlType" class="f-select" onchange="onUrlTypeChange()">
+                            <option value="url">url (exact)</option>
+                            <option value="urlPath">urlPath (path only)</option>
+                            <option value="urlPattern">urlPattern (regex)</option>
+                            <option value="urlPathPattern">urlPathPattern (regex path)</option>
+                            <option value="urlPathTemplate">urlPathTemplate (template)</option>
+                        </select>
+                    </div>
+                    <div class="field" style="margin-bottom:0">
+                        <label class="f-label" id="urlLabel">URL</label>
+                        <input id="urlValue" type="text" class="f-input f-mono"
+                               placeholder="/api/resource">
+                    </div>
+                </div>
+
+                <div style="display:grid;grid-template-columns:110px 100px 100px 1fr;gap:14px;margin-bottom:14px">
+                    <div class="field" style="margin-bottom:0">
+                        <label class="f-label">Method</label>
+                        <select id="method" class="f-select">
+                            <option>GET</option>
+                            <option>POST</option>
+                            <option>PUT</option>
+                            <option>DELETE</option>
+                            <option>PATCH</option>
+                        </select>
+                    </div>
+                    <div class="field" style="margin-bottom:0">
+                        <label class="f-label">Status</label>
+                        <input id="status" type="number" class="f-input f-mono" value="200">
+                    </div>
+                    <div class="field" style="margin-bottom:0">
+                        <label class="f-label">
+                            Priority
+                            <span style="cursor:pointer;color:var(--c-accent);font-weight:400;margin-left:3px"
+                                  onclick="togglePriorityHint()">?</span>
+                        </label>
+                        <input id="priority" type="number" class="f-input f-mono" placeholder="e.g. 1" min="1">
+                    </div>
+                    <div class="field" style="margin-bottom:0">
+                        <label class="f-label">Name <span class="f-hint">(optional)</span></label>
+                        <input id="name" type="text" class="f-input" placeholder="e.g. Get user by ID">
+                    </div>
+                </div>
+
+                <div id="priorityHint" class="notice n-info" style="display:none;margin-bottom:14px">
+                    <span class="notice-ico">ℹ</span>
+                    <div style="font-size:12.5px;line-height:1.7">
+                        <strong>How priorities work:</strong> lower number = higher priority.
+                        <code>1</code> wins over <code>5</code>. Mappings without a priority
+                        default to <code>5</code>. Use the Conflicts page to reorder via drag-and-drop.
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="f-label">Response headers <span
+                            class="f-hint">(one per line: Header-Name: value)</span></label>
+                    <textarea id="headers" class="f-textarea f-mono" rows="3"
+                              placeholder="Content-Type: application/json&#10;X-Custom-Header: value"></textarea>
+                </div>
+
+                <div class="field" style="margin-bottom:0">
+                    <label class="f-label">Response body</label>
+                    <textarea id="body" class="f-textarea f-mono" rows="9"
+                              placeholder='{"key": "value"}'></textarea>
+
+                    <div id="templateHint" class="notice n-info" style="display:none;margin-top:8px;margin-bottom:0">
+                        <span class="notice-ico">⚡</span>
+                        <div style="font-size:12px;line-height:1.8">
+                            <strong>Response Templating detected.</strong>
+                            Add <code>"transformers": ["response-template"]</code> to your response.<br>
+                            Helpers: <code>{{request.path}}</code>
+                            <code>{{request.pathSegments.[0]}}</code>
+                            <code>{{request.method}}</code>
+                            <code>{{request.headers.Authorization}}</code>
+                            <code>{{request.body}}</code>
+                            <code>{{now format='yyyy-MM-dd'}}</code>
+                            <code>{{randomValue length=10 type='ALPHANUMERIC'}}</code>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="jsonTab" style="display:none">
+            <div class="card card-bd">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+                    <span class="t3" style="font-size:12px">Full mapping JSON - nulls are omitted on save</span>
+                    <button class="btn btn-ghost btn-sm" onclick="validateJson()">✓ Validate</button>
+                </div>
+                <textarea id="rawJson" class="f-textarea f-mono" rows="24"
+                          placeholder='{&#10;  "request": { "method": "GET", "url": "/api/example" },&#10;  "response": { "status": 200, "body": "{}" }&#10;}'></textarea>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:18px">
+            <button class="btn btn-primary" onclick="save(false)">Save mapping</button>
+            <button class="btn btn-ghost" onclick="cancelEdit()">Cancel</button>
+        </div>
+    </main>
+</div>
+<script th:src="@{/webjars/bootstrap/5.3.2/js/bootstrap.bundle.min.js}"></script>
+<script th:inline="javascript">
+    const existingJson = /*[[${mappingJson}]]*/ null;
+    const mappingId    = /*[[${mapping.id}]]*/ null;
+
+    const URL_TYPE_LABELS = {
+        url:             'URL (exact match)',
+        urlPath:         'URL Path (ignores query string)',
+        urlPattern:      'URL Pattern (regex)',
+        urlPathPattern:  'URL Path Pattern (regex, ignores query)',
+        urlPathTemplate: 'URL Path Template'
+    };
+
+    if (existingJson) {
+        try {
+            const m = JSON.parse(existingJson);
+            // detect URL type
+            const req = m.request || {};
+            let urlType = 'url', urlVal = '';
+            if (req.url)             { urlType = 'url';             urlVal = req.url; }
+            else if (req.urlPath)    { urlType = 'urlPath';         urlVal = req.urlPath; }
+            else if (req.urlPattern) { urlType = 'urlPattern';      urlVal = req.urlPattern; }
+            else if (req.urlPathPattern) { urlType = 'urlPathPattern'; urlVal = req.urlPathPattern; }
+            else if (req.urlPathTemplate){ urlType = 'urlPathTemplate'; urlVal = req.urlPathTemplate; }
+
+            document.getElementById('urlType').value  = urlType;
+            document.getElementById('urlValue').value = urlVal;
+            onUrlTypeChange();
+
+            document.getElementById('method').value   = req.method || 'GET';
+            document.getElementById('status').value   = m.response?.status || 200;
+            document.getElementById('priority').value = m.priority || '';
+            document.getElementById('name').value     = m.name || '';
+
+            // body - prefer jsonBody, fallback to body
+            const resp = m.response || {};
+            let bodyVal = '';
+            if (resp.jsonBody != null) {
+                bodyVal = typeof resp.jsonBody === 'string'
+                    ? resp.jsonBody
+                    : JSON.stringify(resp.jsonBody, null, 2);
+            } else if (resp.body != null) {
+                bodyVal = resp.body;
+            }
+            document.getElementById('body').value = bodyVal;
+
+            if (resp.headers) {
+                document.getElementById('headers').value =
+                    Object.entries(resp.headers).map(([k,v]) => k+': '+v).join('\n');
+            }
+
+            document.getElementById('rawJson').value = toCleanJson(m);
+        } catch(e) { console.error('Init error', e); }
+    }
+
+    function onUrlTypeChange() {
+        const type = document.getElementById('urlType').value;
+        document.getElementById('urlLabel').textContent = URL_TYPE_LABELS[type] || 'URL';
+    }
+
+    function switchTab(tab) {
+        const isForm = tab === 'form';
+        document.getElementById('formTab').style.display = isForm ? '' : 'none';
+        document.getElementById('jsonTab').style.display = isForm ? 'none' : '';
+        document.getElementById('tabFormBtn').className  = 'tab' + (isForm ? ' active' : '');
+        document.getElementById('tabJsonBtn').className  = 'tab' + (!isForm ? ' active' : '');
+        isForm ? syncJsonToForm() : syncFormToJson();
+    }
+
+    function syncFormToJson() {
+        document.getElementById('rawJson').value = toCleanJson(buildFromForm());
+    }
+    function syncJsonToForm() {
+        try {
+            const m = JSON.parse(document.getElementById('rawJson').value);
+            const req = m.request || {};
+            let urlType = 'url', urlVal = '';
+            if (req.url)                 { urlType = 'url';             urlVal = req.url; }
+            else if (req.urlPath)        { urlType = 'urlPath';         urlVal = req.urlPath; }
+            else if (req.urlPattern)     { urlType = 'urlPattern';      urlVal = req.urlPattern; }
+            else if (req.urlPathPattern) { urlType = 'urlPathPattern';  urlVal = req.urlPathPattern; }
+            else if (req.urlPathTemplate){ urlType = 'urlPathTemplate'; urlVal = req.urlPathTemplate; }
+            document.getElementById('urlType').value  = urlType;
+            document.getElementById('urlValue').value = urlVal;
+            onUrlTypeChange();
+            document.getElementById('method').value   = req.method || 'GET';
+            document.getElementById('status').value   = m.response?.status || 200;
+            document.getElementById('priority').value = m.priority || '';
+            document.getElementById('name').value     = m.name || '';
+            const resp = m.response || {};
+            document.getElementById('body').value = resp.jsonBody
+                ? JSON.stringify(resp.jsonBody, null, 2) : (resp.body || '');
+            if (resp.headers) {
+                document.getElementById('headers').value =
+                    Object.entries(resp.headers).map(([k,v]) => k+': '+v).join('\n');
+            }
+        } catch(e) { alert('Invalid JSON'); }
+    }
+
+    function buildFromForm() {
+        const urlType = document.getElementById('urlType').value;
+        const urlVal  = document.getElementById('urlValue').value;
+        const bodyVal = document.getElementById('body').value.trim();
+        const hdrsRaw = document.getElementById('headers').value.trim();
+        const prio    = document.getElementById('priority').value;
+        const name    = document.getElementById('name').value.trim();
+
+        const request = { method: document.getElementById('method').value };
+        request[urlType] = urlVal;
+
+        const response = { status: parseInt(document.getElementById('status').value) };
+        if (bodyVal) {
+            try { response.jsonBody = JSON.parse(bodyVal); }
+            catch { response.body = bodyVal; }
+        }
+        if (hdrsRaw) {
+            const headers = {};
+            hdrsRaw.split('\n').forEach(line => {
+                const idx = line.indexOf(':');
+                if (idx > 0) headers[line.slice(0,idx).trim()] = line.slice(idx+1).trim();
+            });
+            if (Object.keys(headers).length) response.headers = headers;
+        }
+
+        const o = { request, response };
+        if (mappingId) o.id = mappingId;
+        if (name)      o.name = name;
+        if (prio)      o.priority = parseInt(prio);
+        return o;
+    }
+
+    function getPayload() {
+        const jsonVisible = document.getElementById('jsonTab').style.display !== 'none';
+        if (jsonVisible) {
+            try { return JSON.parse(document.getElementById('rawJson').value); }
+            catch(e) { alert('Invalid JSON: ' + e.message); return null; }
+        }
+        return buildFromForm();
+    }
+
+    function toCleanJson(obj) {
+        return JSON.stringify(obj, (k, v) => v === null || v === undefined ? undefined : v, 2);
+    }
+
+    function cancelEdit() {
+        window.location.href = mappingId ? '/mappings/' + mappingId : '/';
+    }
+
+    function save(force) {
+        const mapping = getPayload();
+        if (!mapping) return;
+        const url    = mappingId ? `/api/mappings/${mappingId}/edit?force=${force}` : `/api/mappings?force=${force}`;
+        const method = mappingId ? 'PUT' : 'POST';
+        fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(mapping) })
+            .then(r => r.json())
+            .then(res => {
+                if (res.error) { alert('Error: ' + res.error); return; }
+                if (res.hasConflict && !res.saved) { showConflict(res.conflictKey, res.strategy); return; }
+                if (res.saved) { window.location.href = '/'; }
+            })
+            .catch(e => alert('Network error: ' + e.message));
+    }
+    function saveForce() { save(true); }
+
+    function showConflict(key, strategy) {
+        document.getElementById('conflictKey').textContent = key;
+        document.getElementById('conflictAlert').style.display = 'flex';
+        document.getElementById('warnActions').style.display = strategy === 'BLOCK' ? 'none' : 'inline';
+    }
+
+    function togglePriorityHint() {
+        const el = document.getElementById('priorityHint');
+        el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    function validateJson() {
+        try { JSON.parse(document.getElementById('rawJson').value); alert('✅ Valid JSON'); }
+        catch(e) { alert('❌ ' + e.message); }
+    }
+
+    document.getElementById('body').addEventListener('input', detectTemplating);
+    document.getElementById('rawJson').addEventListener('input', detectTemplating);
+    function detectTemplating() {
+        const hasT = /\{\{.+?\}\}/.test(document.getElementById('body').value)
+                  || /\{\{.+?\}\}/.test(document.getElementById('rawJson').value);
+        document.getElementById('templateHint').style.display = hasT ? 'flex' : 'none';
+    }
+
+    function toggleTemplates() {
+        const panel = document.getElementById('templatesPanel');
+        if (panel.style.display === 'none') { loadTemplates(); panel.style.display = ''; }
+        else panel.style.display = 'none';
+    }
+
+    let _templates = null;
+    function loadTemplates() {
+        const grid = document.getElementById('templateGrid');
+        if (_templates) return;
+        fetch('/api/mappings/templates')
+            .then(r => r.json())
+            .then(list => {
+                _templates = list;
+                grid.innerHTML = list.map(t => `
+                    <div onclick="applyTemplate('${t.id}')"
+                         style="border:1px solid var(--c-border);border-radius:var(--r-md);
+                                padding:12px 14px;cursor:pointer;transition:all .12s;background:var(--c-surface)"
+                         onmouseover="this.style.borderColor='var(--c-accent)';this.style.background='var(--c-accent-dim)'"
+                         onmouseout="this.style.borderColor='var(--c-border)';this.style.background='var(--c-surface)'">
+                        <div style="font-size:13px;font-weight:600;margin-bottom:3px">${t.label}</div>
+                        <div style="font-size:11.5px;color:var(--c-text-3)">${t.description}</div>
+                    </div>`).join('');
+            });
+    }
+
+    function applyTemplate(id) {
+        if (!_templates) return;
+        const t = _templates.find(x => x.id === id);
+        if (!t) return;
+        document.getElementById('rawJson').value = t.json;
+        document.getElementById('templatesPanel').style.display = 'none';
+        switchTab('json');
+        syncJsonToForm();
+        switchTab('form');
+    }
+</script>
+</body>
+</html>

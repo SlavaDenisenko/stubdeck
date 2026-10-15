@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div th:replace="~{layout :: body(~{::main})}">
+    <main>
+        <div class="page-hd">
+            <div>
+                <h1 class="page-title">Mappings</h1>
+                <p class="page-sub">Browse and manage WireMock stub mappings</p>
+            </div>
+            <a th:if="${accessGuard.canEdit()}" th:href="@{/mappings/new}" class="btn btn-primary">+ New mapping</a>
+        </div>
+
+        <div th:if="${orphanedPendingCount > 0}" class="notice n-warn" style="margin-bottom:14px">
+            <span class="notice-ico">⚠</span>
+            <div>
+                <strong>WireMock may have been reset</strong> -
+                <span th:text="${orphanedPendingCount}"></span> pending change(s) reference stubs that no longer exist
+                in WireMock.
+                <button class="btn btn-sm btn-ghost" style="margin-left:8px" onclick="reconcilePending()">Clean up
+                </button>
+            </div>
+        </div>
+
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-n" style="color:var(--c-accent)" th:text="${totalCount}">0</div>
+                <div class="stat-l">Total mappings</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-n" style="color:var(--c-get)" th:text="${endpointCount}">0</div>
+                <div class="stat-l">Unique endpoints</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-n"
+                     th:style="${conflictCount > 0} ? 'color:var(--c-put)' : 'color:var(--c-get)'"
+                     th:text="${conflictCount}">0
+                </div>
+                <div class="stat-l">Conflict groups</div>
+            </div>
+        </div>
+
+        <div class="toolbar">
+            <div class="search-wrap">
+                <span class="search-ico">🔍</span>
+                <input type="text" id="filterUrl" name="search" th:value="${search}" class="search-inp"
+                       placeholder="Filter by URL...">
+            </div>
+            <select id="filterMethod" name="method" class="meth-sel">
+                <option value="" th:selected="${method == null || method.isEmpty()}">All methods</option>
+                <option value="GET" th:selected="${method == 'GET'}">GET</option>
+                <option value="POST" th:selected="${method == 'POST'}">POST</option>
+                <option value="PUT" th:selected="${method == 'PUT'}">PUT</option>
+                <option value="DELETE" th:selected="${method == 'DELETE'}">DELETE</option>
+                <option value="PATCH" th:selected="${method == 'PATCH'}">PATCH</option>
+            </select>
+        </div>
+
+        <div id="mappings-container" th:data-url="@{/mappings}">
+            <div class="loading">Loading mappings...</div>
+        </div>
+    </main>
+</div>
+
+<div id="lockModal"
+     style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4);align-items:center;justify-content:center"
+     onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:400px;margin:16px;box-shadow:0 20px 60px rgba(0,0,0,.18)">
+        <div style="padding:20px 22px 0;display:flex;align-items:flex-start;gap:14px">
+            <div style="width:40px;height:40px;border-radius:10px;background:#FEF2F2;display:grid;place-items:center;font-size:18px;flex-shrink:0">
+                🔒
+            </div>
+            <div>
+                <div style="font-size:15px;font-weight:600;margin-bottom:4px">Editing blocked</div>
+                <div style="font-size:13px;color:#52525B;line-height:1.6">
+                    <strong id="lockModalUser"></strong> is currently editing this stub.
+                    <div id="lockModalEmail" style="margin-top:4px;font-size:12px;color:#991B1B"></div>
+                </div>
+            </div>
+        </div>
+        <div style="padding:16px 22px 20px;display:flex;justify-content:flex-end">
+            <button class="btn btn-ghost" onclick="document.getElementById('lockModal').style.display='none'">Close
+            </button>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/webjars/bootstrap/5.3.2/js/bootstrap.bundle.min.js}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const container = document.getElementById('mappings-container');
+
+        if (!container) {
+            return;
+        }
+
+        const filterMethod = document.getElementById('filterMethod');
+        const filterUrl    = document.getElementById('filterUrl');
+        const mappingsUrl  = container.dataset.url;
+
+        function loadMappings(page, scrollToTop = false) {
+            const params = new URLSearchParams();
+
+            params.set('page', page);
+            params.set('size', 20);
+
+            const search = filterUrl.value.trim();
+            const method = filterMethod.value;
+
+            if (search) {
+                params.set('search', search);
+            }
+
+            if (method) {
+                params.set('method', method);
+            }
+
+            fetch(mappingsUrl + '?' + params.toString())
+                .then(function (response) {
+                    if (!response.ok) {
+                        throw new Error('Failed to load mappings');
+                    }
+
+                    return response.text();
+                })
+                .then(function (html) {
+                    container.innerHTML = html;
+
+                    if (scrollToTop) {
+                        container.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'start'
+                        });
+                    }
+                })
+                .catch(function (error) {
+                    console.error(error);
+                    container.innerHTML = '<div class="error">Failed to load mappings</div>';
+                });
+        }
+
+        loadMappings(0);
+
+        filterMethod.addEventListener('change', function () {
+            loadMappings(0);
+        });
+
+        let searchTimer;
+
+        filterUrl.addEventListener('input', function () {
+            clearTimeout(searchTimer);
+
+            searchTimer = setTimeout(function () {
+                loadMappings(0);
+            }, 400);
+        });
+
+        container.addEventListener('click', function () {
+            const button = event.target.closest('.page-button');
+
+            if (!button) {
+                return;
+            }
+
+            const page = Number(button.dataset.page);
+            loadMappings(page, true);
+        });
+    });
+
+    function rowClick(e, id) {
+        window.location.href = '/mappings/' + id;
+    }
+
+    function handleDelete(btn) {
+        const id   = btn.dataset.id;
+        const name = btn.dataset.name;
+        openDeleteModal(name, () => {
+            fetch('/api/mappings/' + id, { method: 'DELETE' })
+                .then(r => { if (r.ok) location.reload(); else alert('Delete failed'); });
+        });
+    }
+
+    function openLockModal(user, email) {
+        document.getElementById('lockModalUser').textContent = user || 'Another user';
+        const emailEl = document.getElementById('lockModalEmail');
+        emailEl.textContent = email || '';
+        emailEl.style.display = email ? '' : 'none';
+        document.getElementById('lockModal').style.display = 'flex';
+    }
+
+    async function reconcilePending() {
+        const resp = await fetch('/api/mappings/reconcile', { method: 'POST' });
+        if (resp.ok) {
+            const data = await resp.json();
+            alert('Removed ' + data.removed + ' orphaned pending change(s).');
+            location.reload();
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+plugins {
+    id 'org.springframework.boot'
+}
+
+version '1.0.0'
+
+dependencies {
+    implementation project(':core')
+    implementation project(':auth')
+    implementation project(':changes')
+    implementation 'org.springframework.boot:spring-boot-starter'
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}

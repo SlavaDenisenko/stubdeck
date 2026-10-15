@@ -1,0 +1,22 @@
+services:
+  openldap:
+    image: osixia/openldap:1.5.0
+    container_name: openldap-test
+    ports:
+      - "3389:389"
+    environment:
+      LDAP_ORGANISATION: "Test Company"
+      LDAP_DOMAIN: "company.local"
+      LDAP_ADMIN_PASSWORD: "admin"
+      LDAP_SEED_INTERNAL_LDIF_PATH: /ldif-seed
+    volumes:
+      - ./ldap-seed:/ldif-seed:ro
+
+  phpldapadmin:
+    image: osixia/phpldapadmin:0.9.0
+    container_name: phpldapadmin
+    ports:
+      - "8092:80"
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: openldap
+      PHPLDAPADMIN_HTTPS: "false"

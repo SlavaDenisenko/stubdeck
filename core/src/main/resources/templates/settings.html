@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div th:replace="~{layout :: body(~{::main})}">
+    <main>
+        <div class="page-hd">
+            <div>
+                <h1 class="page-title">Settings</h1>
+                <p class="page-sub">Data source and connection configuration</p>
+            </div>
+        </div>
+
+        <div th:if="${instancesEnabled}" class="notice n-info" style="margin-bottom:20px">
+            <span class="notice-ico">ℹ</span>
+            <div>
+                <strong>Multi-instance mode is active.</strong>
+                Source type and connection are configured per instance.
+                <a th:href="@{/instances}" style="color:inherit;font-weight:600;margin-left:4px">Manage instances →</a>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+            <div class="card">
+                <div class="card-hd">
+                    <span style="font-weight:600">Data source</span>
+                    <span class="status s-2xx" th:text="${sourceType}"></span>
+                </div>
+                <div class="card-bd">
+                    <p style="font-size:13px;color:var(--c-text-2);margin-bottom:16px">
+                        Choose how StubDeck reads and writes mappings.
+                        <span th:if="${instancesEnabled}"
+                              style="display:block;margin-top:4px;font-size:12px;color:var(--c-text-3)">
+                            Read-only in multi-instance mode - configure per instance.
+                        </span>
+                    </p>
+
+                    <div style="display:flex;flex-direction:column;gap:10px">
+                        <label id="lbl-FILE"
+                               th:style="${instancesEnabled} ? 'display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid var(--c-border);border-radius:var(--r-md);opacity:.65;cursor:default'
+                                                             : 'display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid var(--c-border);border-radius:var(--r-md);cursor:pointer'">
+                            <input type="radio" name="sourceType" value="FILE"
+                                   th:checked="${sourceType == 'FILE'}"
+                                   th:disabled="${instancesEnabled}"
+                                   onchange="selectSource(this)" style="margin-top:2px">
+                            <div>
+                                <div style="font-weight:600;margin-bottom:2px">📁 File system</div>
+                                <div style="font-size:12px;color:var(--c-text-3)">
+                                    Read and write JSON mapping files directly from disk.
+                                    Best for local development.
+                                </div>
+                            </div>
+                        </label>
+
+                        <label id="lbl-API"
+                               th:style="${instancesEnabled} ? 'display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid var(--c-border);border-radius:var(--r-md);opacity:.65;cursor:default'
+                                                             : 'display:flex;align-items:flex-start;gap:12px;padding:14px;border:1px solid var(--c-border);border-radius:var(--r-md);cursor:pointer'">
+                            <input type="radio" name="sourceType" value="API"
+                                   th:checked="${sourceType == 'API'}"
+                                   th:disabled="${instancesEnabled}"
+                                   onchange="selectSource(this)" style="margin-top:2px">
+                            <div>
+                                <div style="font-weight:600;margin-bottom:2px">⚡ Admin API</div>
+                                <div style="font-size:12px;color:var(--c-text-3)">
+                                    Communicate with WireMock via HTTP Admin API.
+                                    Required when WireMock runs in Docker.
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div style="background:var(--c-surface-2);border:1px solid var(--c-border);border-radius:var(--r-md);padding:12px">
+                        <div style="font-size:11px;font-weight:600;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+                            application.yaml
+                        </div>
+                        <pre class="mono" style="font-size:12px;color:var(--c-text-1);margin:0">wiremock:
+  source:
+    type: <span th:text="${sourceType}">FILE</span></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${sourceType == 'API'}" class="card">
+                <div class="card-hd">
+                    <span style="font-weight:600">Admin API connection</span>
+                    <div style="display:flex;gap:8px">
+                        <button class="btn btn-ghost btn-sm" onclick="testConnection()">↺ Test</button>
+                        <button th:if="${!instancesEnabled and accessGuard.canManageSettings()}"
+                                class="btn btn-primary btn-sm" onclick="saveSettings()">Save
+                        </button>
+                    </div>
+                </div>
+                <div class="card-bd">
+
+                    <div class="notice"
+                         th:classappend="${connectionOk} ? 'n-success' : 'n-error'"
+                         style="margin-bottom:16px">
+                        <span class="notice-ico" th:text="${connectionOk} ? '✅' : '❌'"></span>
+                        <div>
+                            <strong th:text="${connectionOk} ? 'Connection successful' : 'Connection failed'"></strong>
+                            <span th:if="${connectionOk}"> - Admin API reachable at <code th:text="${adminUrl}"></code></span>
+                            <span th:if="${!connectionOk}"> - could not reach Admin API at <code
+                                    th:text="${adminUrl}"></code></span>
+                        </div>
+                    </div>
+
+                    <div th:if="${instancesEnabled}" class="notice n-info" style="margin-bottom:16px">
+                        <span class="notice-ico">ℹ</span>
+                        <span style="font-size:12.5px">
+                            Connection is configured per instance.
+                            <a th:href="@{/instances}" style="color:inherit;font-weight:600">Edit in Instances →</a>
+                        </span>
+                    </div>
+                    <div th:if="${!instancesEnabled and !accessGuard.canManageSettings()}" class="notice n-warn"
+                         style="margin-bottom:16px">
+                        <span class="notice-ico">🔒</span>
+                        <span style="font-size:12.5px">Settings can only be modified by administrators.</span>
+                    </div>
+
+                    <div class="field">
+                        <label class="f-label">Scheme</label>
+                        <select id="scheme" class="f-select" th:value="${scheme}"
+                                th:attr="disabled=${(instancesEnabled or !accessGuard.canManageSettings()) ? 'true' : null}">
+                            <option value="http" th:selected="${scheme == 'http'}">http</option>
+                            <option value="https" th:selected="${scheme == 'https'}">https</option>
+                        </select>
+                    </div>
+
+                    <div style="display:grid;grid-template-columns:1fr 100px;gap:12px">
+                        <div class="field">
+                            <label class="f-label">Host</label>
+                            <input id="host" type="text" class="f-input f-mono"
+                                   th:value="${host}" placeholder="localhost"
+                                   th:readonly="${instancesEnabled or !accessGuard.canManageSettings()}">
+                        </div>
+                        <div class="field">
+                            <label class="f-label">Port</label>
+                            <input id="port" type="number" class="f-input f-mono"
+                                   th:value="${port}" placeholder="8080"
+                                   th:readonly="${instancesEnabled or !accessGuard.canManageSettings()}">
+                        </div>
+                    </div>
+
+                    <div class="field">
+                        <label class="f-label">Username <span class="f-hint">(if Basic Auth enabled)</span></label>
+                        <input id="username" type="text" class="f-input"
+                               th:value="${username}" placeholder="leave empty if not required"
+                               th:readonly="${instancesEnabled or !accessGuard.canManageSettings()}">
+                    </div>
+
+                    <div class="field" style="margin-bottom:0">
+                        <label class="f-label">Password</label>
+                        <input id="password" type="password" class="f-input"
+                               th:value="${password}" placeholder="leave empty if not required"
+                               th:readonly="${instancesEnabled or !accessGuard.canManageSettings()}">
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <div id="testResult" style="display:none" class="notice n-info">
+                        <span class="notice-ico" id="testIcon">↺</span>
+                        <span id="testMsg">Testing…</span>
+                    </div>
+
+                    <div id="saveResult" style="display:none" class="notice n-info">
+                        <span class="notice-ico" id="saveIcon">↺</span>
+                        <span id="saveMsg"></span>
+                    </div>
+
+                    <div style="background:var(--c-surface-2);border:1px solid var(--c-border);border-radius:var(--r-md);padding:12px">
+                        <div style="font-size:11px;font-weight:600;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+                            application.yaml
+                        </div>
+                        <pre class="mono" style="font-size:12px;color:var(--c-text-1);margin:0">wiremock:
+  admin:
+    scheme: <span th:text="${scheme}">http</span>
+    host:   <span th:text="${host}">localhost</span>
+    port:   <span th:text="${port}">8080</span></pre>
+                    </div>
+
+                    <div th:if="${!instancesEnabled}" class="notice n-info" style="margin-top:14px;margin-bottom:0">
+                        <span class="notice-ico">ℹ</span>
+                        <span style="font-size:12.5px">
+                            Saved changes apply immediately to the running instance only.
+                            Update <code>application.yaml</code> to persist across restarts.
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <div th:if="${sourceType == 'FILE'}" class="card">
+                <div class="card-hd">
+                    <span style="font-weight:600">File system configuration</span>
+                    <span class="status s-2xx">Active</span>
+                </div>
+                <div class="card-bd">
+                    <div class="field">
+                        <div class="f-label" style="margin-bottom:8px">Mappings directory</div>
+                        <div style="background:var(--c-surface-2);border:1px solid var(--c-border);border-radius:var(--r-md);padding:10px 12px;font-family:var(--f-mono);font-size:12.5px"
+                             th:text="${mappingsPath}">./mappings
+                        </div>
+                        <div style="font-size:12px;color:var(--c-text-3);margin-top:6px">
+                            Set via <code>wiremock.mappings.path</code> in application.yaml
+                        </div>
+                    </div>
+                    <div class="field" style="margin-bottom:0">
+                        <div class="f-label" style="margin-bottom:8px">Changelog</div>
+                        <div style="background:var(--c-surface-2);border:1px solid var(--c-border);border-radius:var(--r-md);padding:10px 12px;font-family:var(--f-mono);font-size:12.5px"
+                             th:text="${changelogPath}">./changelog.log
+                        </div>
+                        <div style="font-size:12px;color:var(--c-text-3);margin-top:6px">
+                            Set via <code>wiremock.changelog.path</code> in application.yaml
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+</div>
+<script th:src="@{/webjars/bootstrap/5.3.2/js/bootstrap.bundle.min.js}"></script>
+<script>
+    (function () {
+        const checked = document.querySelector('input[name=sourceType]:checked');
+        if (!checked) return;
+        const lbl = document.getElementById('lbl-' + checked.value);
+        if (lbl) {
+            lbl.style.borderColor = 'var(--c-accent)';
+            lbl.style.background  = 'var(--c-accent-dim)';
+        }
+    })();
+
+    async function selectSource(radio) {
+        radio.disabled = true;
+        await fetch('/api/settings/source-type', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sourceType: radio.value })
+        });
+        location.reload();
+    }
+
+    function saveSettings() {
+        const scheme   = document.getElementById('scheme').value;
+        const host     = document.getElementById('host').value;
+        const port     = document.getElementById('port').value;
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        const result = document.getElementById('saveResult');
+        const icon   = document.getElementById('saveIcon');
+        const msg    = document.getElementById('saveMsg');
+
+        result.style.display = 'flex';
+        result.className = 'notice n-info';
+        icon.textContent = '↺';
+        msg.textContent  = 'Saving…';
+
+        fetch('/api/settings/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scheme, host, port: parseInt(port), username, password })
+        })
+        .then(r => r.json())
+        .then(res => {
+            result.className = res.ok ? 'notice n-success' : 'notice n-error';
+            icon.textContent = res.ok ? '✅' : '❌';
+            msg.textContent  = res.message;
+        })
+        .catch(e => {
+            result.className = 'notice n-error';
+            icon.textContent = '❌';
+            msg.textContent  = 'Network error: ' + e.message;
+        });
+    }
+
+    function testConnection() {
+        const scheme   = document.getElementById('scheme').value;
+        const host     = document.getElementById('host').value;
+        const port     = document.getElementById('port').value;
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        const result = document.getElementById('testResult');
+        const icon   = document.getElementById('testIcon');
+        const msg    = document.getElementById('testMsg');
+
+        result.style.display = 'flex';
+        result.className = 'notice n-info';
+        icon.textContent = '↺';
+        msg.textContent  = 'Testing connection…';
+
+        fetch('/api/settings/test-connection', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scheme, host, port: parseInt(port), username, password })
+        })
+        .then(r => r.json())
+        .then(res => {
+            result.className = res.ok ? 'notice n-success' : 'notice n-error';
+            icon.textContent = res.ok ? '✅' : '❌';
+            msg.textContent  = res.ok ? 'Connection successful - ' + res.message : 'Failed: ' + res.message;
+        })
+        .catch(e => {
+            result.className = 'notice n-error';
+            icon.textContent = '❌';
+            msg.textContent  = 'Network error: ' + e.message;
+        });
+    }
+</script>
+</body>
+</html>

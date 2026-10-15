@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div th:replace="~{layout :: body(~{::main})}">
+    <main th:with="canEdit=${accessGuard.canEdit()}">
+
+        <div class="page-hd">
+            <div>
+                <h1 class="page-title">Conflicts</h1>
+                <p class="page-sub">Mappings sharing the same method and URL pattern</p>
+            </div>
+            <a th:href="@{/}" class="btn btn-ghost">← All mappings</a>
+        </div>
+
+        <div th:if="${conflicts.isEmpty()}" class="tbl-wrap empty">
+            <div class="empty-ico">✅</div>
+            <div class="empty-title">No conflicts detected</div>
+            <div class="empty-desc">All mappings have unique method + URL combinations</div>
+        </div>
+
+        <div th:each="entry : ${conflicts}" class="card" style="margin-bottom:14px;overflow:hidden">
+            <div class="conflict-hd">
+                <div style="display:flex;align-items:center;gap:10px">
+                <span class="method"
+                      th:with="method=${entry.key.split(' ')[0]}"
+                      th:classappend="'m-' + ${method}"
+                      th:text="${method}"></span>
+                    <span class="mono fw5"
+                          th:text="${entry.key.contains(' ')} ? ${entry.key.substring(entry.key.indexOf(' ')+1)} : ${entry.key}"></span>
+                </div>
+                <span class="conflict-badge" th:text="${entry.value.size()} + ' mappings'"></span>
+            </div>
+
+            <table class="tbl" th:id="'group-' + ${entryStat.index}">
+                <colgroup>
+                    <col style="width:36px"/>
+                    <col style="width:80px"/>
+                    <col/>
+                    <col style="width:80px"/>
+                    <col style="width:48px"/>
+                </colgroup>
+                <thead>
+                <tr>
+                    <th></th>
+                    <th class="center">Priority</th>
+                    <th>Name</th>
+                    <th class="center">Status</th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="mapping : ${entry.value}"
+                    th:data-id="${mapping.id}"
+                    th:data-priority="${mapping.priority}">
+                    <td>
+                        <span th:if="${canEdit}" class="drag-handle" title="Drag to reorder">
+                            <svg width="10" height="14" viewBox="0 0 10 14" fill="none"
+                                 xmlns="http://www.w3.org/2000/svg">
+                                <circle cx="3" cy="2.5" r="1.2" fill="#A1A1AA"/>
+                                <circle cx="7" cy="2.5" r="1.2" fill="#A1A1AA"/>
+                                <circle cx="3" cy="7" r="1.2" fill="#A1A1AA"/>
+                                <circle cx="7" cy="7" r="1.2" fill="#A1A1AA"/>
+                                <circle cx="3" cy="11.5" r="1.2" fill="#A1A1AA"/>
+                                <circle cx="7" cy="11.5" r="1.2" fill="#A1A1AA"/>
+                            </svg>
+                        </span>
+                    </td>
+                    <td class="center mono t3 prio-cell" style="white-space:nowrap"
+                        th:text="${mapping.priority} ?: '—'"></td>
+                    <td class="t2 trunc" th:text="${mapping.name} ?: '—'"></td>
+                    <td class="center">
+                        <span class="status"
+                              th:with="s=${mapping.response?.status}"
+                              th:classappend="${s == null} ? 's-nil' :
+                                              (${s >= 200 and s < 300} ? 's-2xx' :
+                                              (${s >= 300 and s < 400} ? 's-3xx' :
+                                              (${s >= 400 and s < 500} ? 's-4xx' : 's-5xx')))"
+                              th:text="${s} ?: '—'"></span>
+                    </td>
+                    <td>
+                        <a th:if="${canEdit}"
+                           th:href="@{/mappings/{id}/edit(id=${mapping.id})}"
+                           class="btn btn-ico btn-sm" title="Edit">✏️</a>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+</div>
+<script th:src="@{/webjars/bootstrap/5.3.2/js/bootstrap.bundle.min.js}"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+<script th:inline="javascript">
+    if (/*[[${@accessGuard.canEdit()}]]*/ false) {
+        document.querySelectorAll('[id^="group-"]').forEach(tbl => {
+            const tbody = tbl.querySelector('tbody');
+            const originalOrder = [...tbody.querySelectorAll('tr')].map(r => r.dataset.id);
+
+            Sortable.create(tbody, {
+                handle: '.drag-handle',
+                animation: 150,
+                onEnd: () => {
+                    const rows     = [...tbody.querySelectorAll('tr')];
+                    const newOrder = rows.map(r => r.dataset.id);
+
+                    const changed = [];
+                    newOrder.forEach((id, i) => {
+                        if (id !== originalOrder[i]) {
+                            changed.push({ id, priority: i + 1 });
+                        }
+                    });
+
+                    if (!changed.length) return;
+
+                    const changedIds = new Set(changed.map(x => x.id));
+                    rows.forEach((r, i) => {
+                        if (changedIds.has(r.dataset.id)) {
+                            r.querySelector('.prio-cell').textContent = i + 1;
+                            r.dataset.priority = i + 1;
+                        }
+                    });
+
+                    fetch('/api/mappings/priority/batch', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(changed)
+                    });
+                }
+            });
+        });
+    }
+</script>
+</body>
+</html>

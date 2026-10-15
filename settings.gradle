@@ -1,0 +1,2 @@
+rootProject.name = 'stubdeck'
+include 'core', 'auth', 'app', 'changes'

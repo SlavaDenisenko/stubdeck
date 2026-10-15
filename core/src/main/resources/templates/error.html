@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div th:replace="~{layout :: body(~{::main})}">
+    <main>
+        <div style="max-width:680px;margin:40px auto 0">
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:28px">
+                <div style="font-family:var(--f-mono);font-size:52px;font-weight:700;
+                            color:var(--c-border);line-height:1;user-select:none"
+                     th:text="${status} ?: '500'">500
+                </div>
+                <div>
+                    <div style="font-size:18px;font-weight:600;color:var(--c-text-1);margin-bottom:3px"
+                         th:text="${error} ?: 'Internal Server Error'">Internal Server Error
+                    </div>
+                    <div class="mono t3" style="font-size:12px"
+                         th:text="${path} ?: ''"></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:16px">
+                <div class="card-hd" style="background:var(--c-delete-bg);border-bottom-color:var(--c-delete-bd)">
+                    <div style="display:flex;align-items:center;gap:8px">
+                        <span style="font-size:14px">⚠</span>
+                        <span style="font-size:13px;font-weight:600;color:var(--c-delete)">Exception</span>
+                    </div>
+                    <span class="mono t3" style="font-size:11px"
+                          th:if="${timestamp}" th:text="${timestamp}"></span>
+                </div>
+                <div class="card-bd">
+                    <pre style="margin:0;font-family:var(--f-mono);font-size:13px;color:var(--c-text-1);
+                                white-space:pre-wrap;word-break:break-word;line-height:1.6"
+                         th:text="${message} ?: 'An unexpected error occurred. Check the application logs for details.'">
+                    </pre>
+                </div>
+            </div>
+
+            <details th:if="${trace}" style="margin-bottom:16px">
+                <summary style="cursor:pointer;font-size:12.5px;font-weight:600;color:var(--c-text-3);
+                                padding:8px 0;user-select:none;list-style:none;display:flex;
+                                align-items:center;gap:6px">
+                    <span id="traceToggle">▶</span> Stack trace
+                </summary>
+                <div class="card" style="margin-top:8px">
+                    <div class="card-bd" style="padding:14px">
+                        <pre style="margin:0;font-family:var(--f-mono);font-size:11.5px;
+                                    color:var(--c-text-2);white-space:pre-wrap;word-break:break-all;
+                                    line-height:1.55;max-height:420px;overflow-y:auto"
+                             th:text="${trace}"></pre>
+                    </div>
+                </div>
+            </details>
+
+            <div style="display:flex;gap:10px;align-items:center">
+                <a href="/" class="btn btn-primary">← Back to Mappings</a>
+                <button class="btn btn-ghost" onclick="window.history.back()">Go back</button>
+                <button class="btn btn-ghost btn-sm" style="margin-left:auto;color:var(--c-text-3)"
+                        onclick="copyError()">Copy error
+                </button>
+            </div>
+
+            <div th:if="${status == 404}" class="notice n-info" style="margin-top:24px">
+                <span class="notice-ico">ℹ</span>
+                <span>The requested resource was not found. It may have been deleted or the URL is incorrect.</span>
+            </div>
+            <div th:if="${status == 403}" class="notice n-warn" style="margin-top:24px">
+                <span class="notice-ico">⚠</span>
+                <span>Access denied. You don't have permission to access this resource.
+                    <a th:href="@{/logout}" style="color:inherit;text-decoration:underline">Sign out</a>
+                    and try with a different account.</span>
+            </div>
+        </div>
+
+        <div id="errorText" style="display:none"
+             th:text="'[' + (${status} ?: '500') + '] ' + (${error} ?: '') + ': ' + (${message} ?: '') + ' @ ' + (${path} ?: '')">
+        </div>
+
+    </main>
+</div>
+<script th:src="@{/webjars/bootstrap/5.3.2/js/bootstrap.bundle.min.js}"></script>
+<script>
+    document.querySelector('details')?.addEventListener('toggle', function (e) {
+        document.getElementById('traceToggle').textContent = e.target.open ? '▼' : '▶';
+    });
+
+    function copyError() {
+        const text = document.getElementById('errorText')?.textContent?.trim() || window.location.href;
+        navigator.clipboard.writeText(text).then(() => {
+            const btn = event.target;
+            const orig = btn.textContent;
+            btn.textContent = 'Copied';
+            setTimeout(() => btn.textContent = orig, 1500);
+        });
+    }
+</script>
+</body>
+</html>

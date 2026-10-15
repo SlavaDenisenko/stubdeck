@@ -1,0 +1,13 @@
+{
+  "id": "def-456",
+  "name": "Get user",
+  "priority": 1,
+  "request": {
+    "method": "GET",
+    "url": "/api/users/1"
+  },
+  "response": {
+    "status": 200,
+    "body": "{\"id\": 1}"
+  }
+}

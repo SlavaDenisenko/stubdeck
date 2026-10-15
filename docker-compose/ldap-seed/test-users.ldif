@@ -1,0 +1,49 @@
+dn: ou=Users,dc=company,dc=local
+objectClass: organizationalUnit
+ou: Users
+
+dn: ou=Groups,dc=company,dc=local
+objectClass: organizationalUnit
+ou: Groups
+
+dn: cn=admin-user,ou=Users,dc=company,dc=local
+objectClass: inetOrgPerson
+objectClass: person
+cn: admin-user
+sn: Admin
+mail: admin@company.local
+userPassword: admin123
+departmentNumber: IT
+
+dn: cn=dev-user,ou=Users,dc=company,dc=local
+objectClass: inetOrgPerson
+objectClass: person
+cn: dev-user
+sn: Developer
+mail: dev@company.local
+userPassword: dev123
+departmentNumber: IT
+
+dn: cn=qa-user,ou=Users,dc=company,dc=local
+objectClass: inetOrgPerson
+objectClass: person
+cn: qa-user
+sn: QA
+mail: qa@company.local
+userPassword: qa123
+departmentNumber: QA
+
+dn: cn=wiremock-admins,ou=Groups,dc=company,dc=local
+objectClass: groupOfNames
+cn: wiremock-admins
+member: cn=admin-user,ou=Users,dc=company,dc=local
+
+dn: cn=wiremock-developers,ou=Groups,dc=company,dc=local
+objectClass: groupOfNames
+cn: wiremock-developers
+member: cn=dev-user,ou=Users,dc=company,dc=local
+
+dn: cn=wiremock-qa,ou=Groups,dc=company,dc=local
+objectClass: groupOfNames
+cn: wiremock-qa
+member: cn=qa-user,ou=Users,dc=company,dc=local

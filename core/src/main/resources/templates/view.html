@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head th:replace="~{layout :: head}"></head>
+<body>
+<div th:replace="~{layout :: body(~{::main})}">
+    <main>
+        <div class="page-hd">
+            <div>
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+                    <span class="method"
+                          th:classappend="'m-' + (${mapping.request?.method} ?: 'ANY')"
+                          th:text="${mapping.request?.method} ?: 'ANY'"
+                          style="font-size:13px"></span>
+                    <h1 class="page-title mono" style="font-size:16px"
+                        th:text="${mapping.request?.effectiveUrl}"></h1>
+                </div>
+                <p class="page-sub mono t3" th:text="${mapping.id}"></p>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn btn-ico btn-ico-del" title="Delete"
+                        th:if="${accessGuard.canDelete() and canEdit}"
+                        th:data-id="${mapping.id}"
+                        th:data-name="${mapping.name} ?: ${mapping.request?.effectiveUrl}"
+                        onclick="handleDelete(this)">🗑️
+                </button>
+                <button class="btn btn-ico" title="Cannot delete - locked"
+                        th:if="${accessGuard.canDelete() and !canEdit}"
+                        style="color:var(--c-put);border-color:var(--c-put-bd)"
+                        th:data-user="${pending?.changedByDisplay} ?: ${pending?.changedBy}"
+                        th:data-email="${pending?.changedByEmail}"
+                        onclick="openLockModal(this.dataset.user, this.dataset.email)">🔒
+                </button>
+            </div>
+        </div>
+
+        <div th:if="${lockError}" class="notice n-error" style="margin-bottom:16px">
+            <span class="notice-ico">🔒</span>
+            <span th:text="${lockError}"></span>
+        </div>
+
+        <div th:if="${pending != null}" class="notice n-warn" style="margin-bottom:16px">
+            <span class="notice-ico">🔒</span>
+            <div>
+                <strong th:text="${canEdit} ? 'You have unsaved changes on this stub' : 'Unsaved changes by someone else'"></strong>
+                <span th:if="${!canEdit}"> - <strong th:text="${pending.changedByDisplay}"></strong></span>
+                <span class="t3" style="font-size:11px;margin-left:8px"
+                      th:text="'(' + ${pending.action} + ', ' + ${#strings.substring(pending.changedAt, 0, 19)} + ')'"></span>
+            </div>
+        </div>
+        <div th:if="${pending == null}" class="notice n-success" style="margin-bottom:16px">
+            <span class="notice-ico">✅</span>
+            <span>No pending changes - this stub is saved to disk</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 188px;gap:18px;align-items:start;min-width:0">
+            <div style="display:flex;flex-direction:column;gap:14px;min-width:0;overflow:hidden">
+                <div class="card">
+                    <div class="card-hd">
+                        <span style="font-size:13px;font-weight:600">Request</span>
+                        <div style="display:flex;gap:8px">
+                            <span class="mono t3" style="font-size:11px"
+                                  th:text="${mapping.request?.urlType} ?: ''"></span>
+                            <span th:if="${mapping.priority != null}"
+                                  style="font-size:11px;color:var(--c-accent);font-weight:500"
+                                  th:text="'priority ' + ${mapping.priority}"></span>
+                        </div>
+                    </div>
+                    <div class="card-bd" style="padding:14px 18px">
+                        <div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+                            <span class="method"
+                                  th:classappend="'m-' + (${mapping.request?.method} ?: 'ANY')"
+                                  th:text="${mapping.request?.method} ?: 'ANY'"></span>
+                            <code class="mono fw5" style="font-size:13px;color:var(--c-text-1)"
+                                  th:text="${mapping.request?.effectiveUrl}"></code>
+                        </div>
+                        <div th:if="${mapping.name != null}" style="font-size:12px;color:var(--c-text-3)">
+                            Name: <span class="fw5" style="color:var(--c-text-2)" th:text="${mapping.name}"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-hd">
+                        <span style="font-size:13px;font-weight:600">Response</span>
+                        <span class="status"
+                              th:with="s=${mapping.response?.status}"
+                              th:classappend="${s == null} ? 's-nil' :
+                                              (${s >= 200 and s < 300} ? 's-2xx' :
+                                              (${s >= 300 and s < 400} ? 's-3xx' :
+                                              (${s >= 400 and s < 500} ? 's-4xx' : 's-5xx')))"
+                              th:text="${s} ?: '—'"></span>
+                    </div>
+                    <div class="card-bd" style="padding:14px 18px">
+                        <div th:if="${mapping.response?.headers != null}" style="margin-bottom:12px">
+                            <div style="font-size:11px;font-weight:600;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+                                Headers
+                            </div>
+                            <div th:each="entry : ${mapping.response.headers}"
+                                 class="mono" style="font-size:12px;margin-bottom:3px">
+                                <span style="color:var(--c-text-2)" th:text="${entry.key}"></span>:
+                                <span style="color:var(--c-text-1)" th:text="${entry.value}"></span>
+                            </div>
+                        </div>
+                        <div th:if="${mapping.response?.jsonBody != null or mapping.response?.body != null}">
+                            <div style="font-size:11px;font-weight:600;color:var(--c-text-3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+                                Body
+                            </div>
+                            <pre id="responseBody" class="f-textarea f-mono"
+                                 style="background:var(--c-surface-2);border:1px solid var(--c-border);border-radius:var(--r-md);padding:10px 12px;font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;margin:0"
+                                 th:text="${mapping.response?.jsonBody} ?: ${mapping.response?.body}"></pre>
+                        </div>
+                        <div th:if="${mapping.response?.jsonBody == null and mapping.response?.body == null}"
+                             class="t3" style="font-size:13px">(empty body)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-hd">
+                        <span style="font-size:13px;font-weight:600">Raw JSON</span>
+                        <button class="btn btn-ghost btn-sm" onclick="copyJson()">Copy</button>
+                    </div>
+                    <div class="card-bd" style="padding:14px 18px">
+                        <pre id="rawJsonDisplay" class="f-textarea f-mono"
+                             style="background:var(--c-surface-2);border:1px solid var(--c-border);border-radius:var(--r-md);padding:10px 12px;font-size:12px;line-height:1.6;overflow-x:auto;white-space:pre-wrap;margin:0;max-height:300px"
+                             th:text="${mappingJson}"></pre>
+                    </div>
+                </div>
+            </div>
+
+            <div style="width:180px;display:flex;flex-direction:column;gap:10px;position:sticky;top:0">
+                <a th:if="${canEdit and accessGuard.canEdit()}"
+                   th:href="@{/mappings/{id}/edit(id=${mapping.id})}"
+                   class="btn btn-primary"
+                   style="width:100%;justify-content:center">
+                    ✏️ Edit
+                </a>
+                <button th:if="${!canEdit and accessGuard.canEdit()}"
+                        class="btn btn-ghost"
+                        style="width:100%;justify-content:center;border-color:var(--c-put-bd);color:var(--c-put)"
+                        th:data-user="${pending?.changedByDisplay} ?: ${pending?.changedBy}"
+                        th:data-email="${pending?.changedByEmail}"
+                        onclick="openLockModal(this.dataset.user, this.dataset.email)">
+                    🔒 Editing blocked
+                </button>
+                <a th:href="@{/}" class="btn btn-ghost" style="width:100%;justify-content:center">← Back</a>
+            </div>
+        </div>
+    </main>
+</div>
+<div id="lockModal"
+     style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.4);align-items:center;justify-content:center"
+     onclick="if(event.target===this)this.style.display='none'">
+    <div style="background:#fff;border-radius:12px;width:100%;max-width:400px;margin:16px;box-shadow:0 20px 60px rgba(0,0,0,.18)">
+        <div style="padding:20px 22px 0;display:flex;align-items:flex-start;gap:14px">
+            <div style="width:40px;height:40px;border-radius:10px;background:#FEF2F2;display:grid;place-items:center;font-size:18px;flex-shrink:0">
+                🔒
+            </div>
+            <div>
+                <div style="font-size:15px;font-weight:600;margin-bottom:4px">Editing blocked</div>
+                <div style="font-size:13px;color:#52525B;line-height:1.6">
+                    <strong id="lockModalUser"></strong> is currently editing this stub.
+                    <div id="lockModalEmail" style="margin-top:4px;font-size:12px;color:#991B1B"></div>
+                </div>
+            </div>
+        </div>
+        <div style="padding:16px 22px 20px;display:flex;justify-content:flex-end">
+            <button class="btn btn-ghost" onclick="document.getElementById('lockModal').style.display='none'">Close
+            </button>
+        </div>
+    </div>
+</div>
+<script>
+    function handleDelete(btn) {
+        const id   = btn.dataset.id;
+        const name = btn.dataset.name;
+        openDeleteModal(name, () => {
+            fetch('/api/mappings/' + id, { method: 'DELETE' })
+                .then(r => {
+                    if (r.ok) {
+                        window.location.href = '/';
+                    } else if (r.status === 409) {
+                        r.json().then(data => openLockModal(data.lockedBy, data.lockedByEmail));
+                    } else {
+                        alert('Delete failed');
+                    }
+                });
+        });
+    }
+
+    function copyJson() {
+        const text = document.getElementById('rawJsonDisplay').textContent;
+        navigator.clipboard.writeText(text).catch(() => {});
+    }
+
+    function openLockModal(user, email) {
+        document.getElementById('lockModalUser').textContent = user || 'Another user';
+        const emailEl = document.getElementById('lockModalEmail');
+        emailEl.textContent = email || '';
+        emailEl.style.display = email ? '' : 'none';
+        document.getElementById('lockModal').style.display = 'flex';
+    }
+</script>
+</body>
+</html>
