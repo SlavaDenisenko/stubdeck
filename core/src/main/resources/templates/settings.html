@@ -234,7 +234,7 @@
 
     async function selectSource(radio) {
         radio.disabled = true;
-        await fetch('/api/settings/source-type', {
+        await secureFetch('/api/settings/source-type', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ sourceType: radio.value })
@@ -258,7 +258,7 @@
         icon.textContent = '↺';
         msg.textContent  = 'Saving…';
 
-        fetch('/api/settings/save', {
+        secureFetch('/api/settings/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ scheme, host, port: parseInt(port), username, password })
@@ -292,7 +292,7 @@
         icon.textContent = '↺';
         msg.textContent  = 'Testing connection…';
 
-        fetch('/api/settings/test-connection', {
+        secureFetch('/api/settings/test-connection', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ scheme, host, port: parseInt(port), username, password })

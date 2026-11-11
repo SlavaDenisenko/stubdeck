@@ -116,7 +116,7 @@
                 params.set('method', method);
             }
 
-            fetch(mappingsUrl + '?' + params.toString())
+            secureFetch(mappingsUrl + '?' + params.toString())
                 .then(function (response) {
                     if (!response.ok) {
                         throw new Error('Failed to load mappings');
@@ -176,7 +176,7 @@
         const id   = btn.dataset.id;
         const name = btn.dataset.name;
         openDeleteModal(name, () => {
-            fetch('/api/mappings/' + id, { method: 'DELETE' })
+            secureFetch('/api/mappings/' + id, { method: 'DELETE' })
                 .then(r => { if (r.ok) location.reload(); else alert('Delete failed'); });
         });
     }
@@ -190,7 +190,7 @@
     }
 
     async function reconcilePending() {
-        const resp = await fetch('/api/mappings/reconcile', { method: 'POST' });
+        const resp = await secureFetch('/api/mappings/reconcile', { method: 'POST' });
         if (resp.ok) {
             const data = await resp.json();
             alert('Removed ' + data.removed + ' orphaned pending change(s).');

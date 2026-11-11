@@ -315,7 +315,7 @@
         if (!mapping) return;
         const url    = mappingId ? `/api/mappings/${mappingId}/edit?force=${force}` : `/api/mappings?force=${force}`;
         const method = mappingId ? 'PUT' : 'POST';
-        fetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(mapping) })
+        secureFetch(url, { method, headers:{'Content-Type':'application/json'}, body: JSON.stringify(mapping) })
             .then(r => r.json())
             .then(res => {
                 if (res.error) { alert('Error: ' + res.error); return; }
@@ -360,7 +360,7 @@
     function loadTemplates() {
         const grid = document.getElementById('templateGrid');
         if (_templates) return;
-        fetch('/api/mappings/templates')
+        secureFetch('/api/mappings/templates')
             .then(r => r.json())
             .then(list => {
                 _templates = list;

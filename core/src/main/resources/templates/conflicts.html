@@ -122,7 +122,7 @@
                         }
                     });
 
-                    fetch('/api/mappings/priority/batch', {
+                    secureFetch('/api/mappings/priority/batch', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(changed)

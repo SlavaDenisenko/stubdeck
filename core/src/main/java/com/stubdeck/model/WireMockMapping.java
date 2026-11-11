@@ -16,10 +16,12 @@ public class WireMockMapping {
     @JsonIgnore
     private String fileName;
 
+    @JsonIgnore
     public String getEffectiveUrl() {
         return request == null ? null : request.getEffectiveUrl();
     }
 
+    @JsonIgnore
     public String getMethod() {
         return request == null ? null : request.getMethod();
     }

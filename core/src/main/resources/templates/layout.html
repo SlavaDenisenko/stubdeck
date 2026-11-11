@@ -4,6 +4,8 @@
 <head th:fragment="head">
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <meta name="_csrf" th:if="${_csrf != null}" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:if="${_csrf != null}" th:content="${_csrf.headerName}"/>
     <title>StubDeck</title>
     <link rel="preconnect" href="https://fonts.googleapis.com"/>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
@@ -547,5 +549,23 @@
             if (_deleteCallback) _deleteCallback();
             closeDeleteModal();
         });
+
+        function secureFetch(url, options = {}) {
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+
+            const headers = new Headers(options.headers);
+
+            if (csrfToken && csrfHeader) {
+                headers.set(csrfHeader, csrfToken);
+            }
+
+            const request = new Request(url, {
+                ...options,
+                headers,
+                credentials: 'same-origin'
+            });
+            return fetch(request);
+        }
     </script>
 </th:block>
